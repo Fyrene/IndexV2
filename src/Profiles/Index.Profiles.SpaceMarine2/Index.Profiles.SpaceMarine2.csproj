@@ -26,33 +26,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="ILRepack.MSBuild.Task" Version="2.0.13" />
+		<PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.45">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
 	</ItemGroup>
-
-	<Target Name="ILRepack" AfterTargets="Build">
-
-		<PropertyGroup>
-			<WorkingDirectory>$(MSBuildThisFileDirectory)bin\$(Configuration)\$(TargetFramework)</WorkingDirectory>
-		</PropertyGroup>
-
-		<ItemGroup>
-			<InputAssemblies Include="LibSaber.dll" />
-			<InputAssemblies Include="LibSaber.SpaceMarine2.dll" />
-		</ItemGroup>
-
-		<ItemGroup>
-			<InternalizeExcludeAssemblies Include="^LibSaber" />
-		</ItemGroup>
-
-		<ILRepack
-			OutputType="$(OutputType)"
-			MainAssembly="$(AssemblyName).dll"
-			OutputAssembly="$(AssemblyName).dll"
-			InputAssemblies="@(InputAssemblies)"
-			InternalizeExcludeAssemblies="@(InternalizeExcludeAssemblies)"
-			WorkingDirectory="$(WorkingDirectory)" />
-
-	</Target>
 
 	<Target Name="PostBuild" AfterTargets="ILRepack">
 		<Exec Command="mkdir &quot;$(SolutionDir)src\Index.App\bin\$(Configuration)\net8.0-windows7.0\GameProfiles&quot;" ContinueOnError="true" />
@@ -61,3 +39,6 @@
 	</Target>
 
 </Project>
+
+
+

@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <Target Name="ILRepacker" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+
+    <ItemGroup>
+      <YamlDotNetDll Include="$(NuGetPackageRoot)yamldotnet\16.1.2\lib\net8.0\YamlDotNet.dll" />
+    </ItemGroup>
+
+    <Copy
+      SourceFiles="@(YamlDotNetDll)"
+      DestinationFolder="$(OutputPath)"
+      SkipUnchangedFiles="true" />
+
+    <ItemGroup>
+      <InputAssemblies Include="$(OutputPath)\$(AssemblyName).dll" />
+      <InputAssemblies Include="$(OutputPath)\LibSaber.dll" />
+      <InputAssemblies Include="$(OutputPath)\LibSaber.SpaceMarine2.dll" />
+      <InputAssemblies Include="$(OutputPath)\YamlDotNet.dll" />
+    </ItemGroup>
+
+    <ILRepack
+      InputAssemblies="@(InputAssemblies)"
+      TargetKind="Dll"
+      OutputFile="$(OutputPath)\$(AssemblyName).dll" />
+  </Target>
+
+</Project>

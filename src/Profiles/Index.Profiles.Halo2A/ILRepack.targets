@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="ILRepacker" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <InputAssemblies Include="$(OutputPath)\$(AssemblyName).dll" />
+      <InputAssemblies Include="$(OutputPath)\LibSaber.dll" />
+      <InputAssemblies Include="$(OutputPath)\LibSaber.Halo2A.dll" />
+    </ItemGroup>
+
+    <ILRepack
+      InputAssemblies="@(InputAssemblies)"
+      TargetKind="Dll"
+      OutputFile="$(OutputPath)\$(AssemblyName).dll"
+      LibraryPath="$(OutputPath);$(SolutionDir)src\Index.Core\bin\$(Configuration)\net8.0;$(SolutionDir)src\Index.Domain\bin\$(Configuration)\net8.0;C:\Users\pierr\.nuget\packages\stirlinglabs.assimp.net\23.4.1\lib\net6.0" />
+  </Target>
+</Project>
+
