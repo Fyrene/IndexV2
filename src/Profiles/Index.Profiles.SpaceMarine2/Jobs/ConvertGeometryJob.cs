@@ -54,6 +54,7 @@ namespace Index.Profiles.SpaceMarine2.Jobs
       AddNodes( Context.GeometryGraph.objects );
       //BuildSkinCompounds();
       AddMeshNodes( Context.GeometryGraph.objects );
+      EnsureMeshBoneNodes();
       AddRemainingMeshBones();
       //RenameBones();
 
@@ -205,6 +206,55 @@ namespace Index.Profiles.SpaceMarine2.Jobs
 
         IncreaseCompletedUnits( 1 );
       }
+    }
+
+    private void EnsureMeshBoneNodes()
+    {
+      var meshBoneNames = Context.Scene.Meshes
+        .SelectMany( x => x.Bones )
+        .Select( x => x.Name )
+        .Where( x => !string.IsNullOrEmpty( x ) )
+        .Distinct()
+        .ToArray();
+
+      foreach ( var meshBoneName in meshBoneNames )
+      {
+        if ( Context.Scene.RootNode.FindNode( meshBoneName ) != null )
+          continue;
+
+        var boneObject = Context.GeometryGraph.objects.FirstOrDefault( x => x.GetName() == meshBoneName );
+        if ( boneObject is null )
+          continue;
+
+        EnsureNodeForObject( boneObject );
+      }
+    }
+
+    private Node EnsureNodeForObject( objOBJ obj )
+    {
+      if ( Context.Nodes.TryGetValue( obj.id, out var existingNode ) )
+        return existingNode;
+
+      var parentNode = obj.Parent != null
+        ? EnsureNodeForObject( obj.Parent )
+        : Context.RootNode;
+
+      var objName = obj.GetName();
+      if ( string.IsNullOrEmpty( objName ) )
+        objName = $"Bone{obj.id}";
+
+      var node = new Node( objName, parentNode );
+      parentNode.Children.Add( node );
+      Context.Nodes[ obj.id ] = node;
+
+      if ( !Context.NodeNames.ContainsKey( objName ) )
+        Context.NodeNames.Add( objName, node );
+
+      var transform = obj.MatrixModel.ToAssimp();
+      transform.Transpose();
+      node.Transform = transform;
+
+      return node;
     }
 
     private void AddRemainingMeshBones()
