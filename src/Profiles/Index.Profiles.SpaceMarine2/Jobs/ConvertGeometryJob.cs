@@ -1,4 +1,4 @@
-﻿using Assimp;
+using Assimp;
 using Index.Domain.Assets.Textures;
 using Index.Domain.FileSystem;
 using Index.Jobs;
@@ -106,7 +106,7 @@ namespace Index.Profiles.SpaceMarine2.Jobs
       if ( rootObject.ReadName is null )
         rootObject.ReadName = Context.Name;
 
-      AddNodesRecursive(rootObject, rootNode);
+      AddNodesRecursive( rootObject, rootNode );
 
       //foreach ( var obj in objects )
       //{
@@ -140,17 +140,18 @@ namespace Index.Profiles.SpaceMarine2.Jobs
       //}
     }
 
-    private void AddNodesRecursive(objOBJ obj, Node parentNode)
+    private void AddNodesRecursive( objOBJ obj, Node parentNode )
     {
-      if ( obj.SubMeshes.Any() )
-        return;
-
       var objName = obj.GetName();
+      if ( string.IsNullOrEmpty( objName ) )
+        objName = $"Bone{obj.id}";
 
       var node = new Node( objName, parentNode );
       parentNode.Children.Add( node );
-      Context.Nodes.Add( obj.id, node );
-      Context.NodeNames[ objName ] = node;
+      Context.Nodes[ obj.id ] = node;
+
+      if ( !Context.NodeNames.ContainsKey( objName ) )
+        Context.NodeNames.Add( objName, node );
 
       var transform = obj.MatrixModel.ToAssimp();
       transform.Transpose();
