@@ -1,4 +1,4 @@
-using Assimp;
+﻿using Assimp;
 using Index.Domain.Assets.Textures;
 using Index.Domain.FileSystem;
 using Index.Jobs;
@@ -54,7 +54,6 @@ namespace Index.Profiles.SpaceMarine2.Jobs
       AddNodes( Context.GeometryGraph.objects );
       //BuildSkinCompounds();
       AddMeshNodes( Context.GeometryGraph.objects );
-      EnsureMeshBoneNodes();
       AddRemainingMeshBones();
       //RenameBones();
 
@@ -107,7 +106,7 @@ namespace Index.Profiles.SpaceMarine2.Jobs
       if ( rootObject.ReadName is null )
         rootObject.ReadName = Context.Name;
 
-      AddNodesRecursive( rootObject, rootNode );
+      AddNodesRecursive(rootObject, rootNode);
 
       //foreach ( var obj in objects )
       //{
@@ -141,18 +140,17 @@ namespace Index.Profiles.SpaceMarine2.Jobs
       //}
     }
 
-    private void AddNodesRecursive( objOBJ obj, Node parentNode )
+    private void AddNodesRecursive(objOBJ obj, Node parentNode)
     {
+      if ( obj.SubMeshes.Any() )
+        return;
+
       var objName = obj.GetName();
-      if ( string.IsNullOrEmpty( objName ) )
-        objName = $"Bone{obj.id}";
 
       var node = new Node( objName, parentNode );
       parentNode.Children.Add( node );
-      Context.Nodes[ obj.id ] = node;
-
-      if ( !Context.NodeNames.ContainsKey( objName ) )
-        Context.NodeNames.Add( objName, node );
+      Context.Nodes.Add( obj.id, node );
+      Context.NodeNames[ objName ] = node;
 
       var transform = obj.MatrixModel.ToAssimp();
       transform.Transpose();
@@ -187,12 +185,11 @@ namespace Index.Profiles.SpaceMarine2.Jobs
 
     private void AddSubMeshes( objOBJ obj )
     {
-      var node = Context.Nodes.TryGetValue( obj.id, out var existingNode )
-        ? existingNode
-        : Context.RootNode;
-
       foreach ( var submesh in obj.SubMeshes )
       {
+        var node = new Node( obj.GetName(), Context.RootNode );
+        Context.RootNode.Children.Add( node );
+
         var builder = new MeshBuilder( Context, obj, submesh );
         var mesh = builder.Build();
 
@@ -200,61 +197,16 @@ namespace Index.Profiles.SpaceMarine2.Jobs
         var meshId = Context.Scene.Meshes.Count - 1;
         node.MeshIndices.Add( meshId );
 
+        var transform = obj.MatrixLT.ToAssimp();
+        transform.Transpose();
+        node.Transform = transform;
+
         var meshName = obj.GetName();
         if ( !mesh.HasBones && obj.Parent != null )
           builder.ParentMeshToBone( obj.Parent );
 
         IncreaseCompletedUnits( 1 );
       }
-    }
-
-    private void EnsureMeshBoneNodes()
-    {
-      var meshBoneNames = Context.Scene.Meshes
-        .SelectMany( x => x.Bones )
-        .Select( x => x.Name )
-        .Where( x => !string.IsNullOrEmpty( x ) )
-        .Distinct()
-        .ToArray();
-
-      foreach ( var meshBoneName in meshBoneNames )
-      {
-        if ( Context.Scene.RootNode.FindNode( meshBoneName ) != null )
-          continue;
-
-        var boneObject = Context.GeometryGraph.objects.FirstOrDefault( x => x.GetName() == meshBoneName );
-        if ( boneObject is null )
-          continue;
-
-        EnsureNodeForObject( boneObject );
-      }
-    }
-
-    private Node EnsureNodeForObject( objOBJ obj )
-    {
-      if ( Context.Nodes.TryGetValue( obj.id, out var existingNode ) )
-        return existingNode;
-
-      var parentNode = obj.Parent != null
-        ? EnsureNodeForObject( obj.Parent )
-        : Context.RootNode;
-
-      var objName = obj.GetName();
-      if ( string.IsNullOrEmpty( objName ) )
-        objName = $"Bone{obj.id}";
-
-      var node = new Node( objName, parentNode );
-      parentNode.Children.Add( node );
-      Context.Nodes[ obj.id ] = node;
-
-      if ( !Context.NodeNames.ContainsKey( objName ) )
-        Context.NodeNames.Add( objName, node );
-
-      var transform = obj.MatrixModel.ToAssimp();
-      transform.Transpose();
-      node.Transform = transform;
-
-      return node;
     }
 
     private void AddRemainingMeshBones()
