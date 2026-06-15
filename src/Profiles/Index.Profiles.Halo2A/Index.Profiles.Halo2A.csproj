@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -8,6 +8,7 @@
 		<FileVersion>0.3.0.*</FileVersion>
 		<Deterministic>false</Deterministic>
 		<RunPostBuildEvent>Always</RunPostBuildEvent>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -26,19 +27,18 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.45">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-    </PackageReference>
+		<PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.45" PrivateAssets="all" />
 	</ItemGroup>
 
-	<Target Name="PostBuild" AfterTargets="ILRepack">
-		<Exec Command="mkdir &quot;$(SolutionDir)src\Index.App\bin\$(Configuration)\net8.0-windows7.0\GameProfiles&quot;" ContinueOnError="true" />
-		<Exec Command="copy /Y &quot;$(TargetDir)$(TargetName).dll&quot; &quot;$(SolutionDir)src\Index.App\bin\$(Configuration)\net8.0-windows7.0\GameProfiles\$(TargetName).dll&quot;" />
-		<Exec Command="copy /Y &quot;$(TargetDir)$(TargetName).pdb&quot; &quot;$(SolutionDir)src\Index.App\bin\$(Configuration)\net8.0-windows7.0\GameProfiles\$(TargetName).pdb&quot;" />
+	<Target Name="PostBuild" AfterTargets="ILRepacker">
+		<PropertyGroup>
+			<GameProfilesDir>$(SolutionDir)src\Index.App\bin\$(Configuration)\net8.0-windows7.0\GameProfiles</GameProfilesDir>
+		</PropertyGroup>
+
+		<MakeDir Directories="$(GameProfilesDir)" />
+
+		<Copy SourceFiles="$(TargetDir)$(TargetName).dll" DestinationFiles="$(GameProfilesDir)\$(TargetName).dll" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFiles="$(GameProfilesDir)\$(TargetName).pdb" SkipUnchangedFiles="true" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
 	</Target>
 
 </Project>
-
-
-
