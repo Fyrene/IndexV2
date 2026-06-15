@@ -186,21 +186,18 @@ namespace Index.Profiles.SpaceMarine2.Jobs
 
     private void AddSubMeshes( objOBJ obj )
     {
+      var node = Context.Nodes.TryGetValue( obj.id, out var existingNode )
+        ? existingNode
+        : Context.RootNode;
+
       foreach ( var submesh in obj.SubMeshes )
       {
-        var node = new Node( obj.GetName(), Context.RootNode );
-        Context.RootNode.Children.Add( node );
-
         var builder = new MeshBuilder( Context, obj, submesh );
         var mesh = builder.Build();
 
         Context.Scene.Meshes.Add( mesh );
         var meshId = Context.Scene.Meshes.Count - 1;
         node.MeshIndices.Add( meshId );
-
-        var transform = obj.MatrixLT.ToAssimp();
-        transform.Transpose();
-        node.Transform = transform;
 
         var meshName = obj.GetName();
         if ( !mesh.HasBones && obj.Parent != null )
