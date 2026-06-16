@@ -13,6 +13,26 @@ namespace Index.Profiles.SpaceMarine2.Jobs
   public class ConvertGeometryJob : JobBase
   {
 
+    #region Data Members
+
+    private static readonly HashSet<string> AnimationHelperBoneNames = new HashSet<string>( StringComparer.Ordinal )
+    {
+      "ROOT",
+      "Trajectory",
+      "smart_target",
+      "cam_root",
+      "cam_anim",
+      "surface",
+      "foot_targ_L",
+      "foot_targ_R",
+      "GUN_ANIM",
+      "Gun_pose",
+      "Left_hand_hold",
+      "Right_hand_hold"
+    };
+
+    #endregion
+
     #region Properties
 
     protected SceneContext Context { get; set; }
@@ -55,6 +75,7 @@ namespace Index.Profiles.SpaceMarine2.Jobs
       //BuildSkinCompounds();
       AddMeshNodes( Context.GeometryGraph.objects );
       AddRemainingMeshBones();
+      AddAnimationHelperBones();
       //RenameBones();
 
       //using ( var ctx = new AssimpContext() )
@@ -106,7 +127,7 @@ namespace Index.Profiles.SpaceMarine2.Jobs
       if ( rootObject.ReadName is null )
         rootObject.ReadName = Context.Name;
 
-      AddNodesRecursive(rootObject, rootNode);
+      AddNodesRecursive( rootObject, rootNode );
 
       //foreach ( var obj in objects )
       //{
@@ -140,7 +161,7 @@ namespace Index.Profiles.SpaceMarine2.Jobs
       //}
     }
 
-    private void AddNodesRecursive(objOBJ obj, Node parentNode)
+    private void AddNodesRecursive( objOBJ obj, Node parentNode )
     {
       if ( obj.SubMeshes.Any() )
         return;
@@ -241,46 +262,108 @@ namespace Index.Profiles.SpaceMarine2.Jobs
           }
         }
       }
+    }
 
-      // Issue #20: Add zero weights to any unused bones for animation retargeting
-      //var boneObjects = Context.GeometryGraph.objects
-      //  .Where( x => x.GetName() == x.GetName() )
-      //  .ToArray();
+    private void AddAnimationHelperBones()
+    {
+      // Assimp/Blender only promotes nodes to armature bones when they are referenced by a mesh bone.
+      // SM2 animation helpers such as Trajectory and weapon hold points can be unskinned nodes,
+      // but SANI tracks still target them. Add them as zero-weight bones so they survive FBX export.
 
-      //foreach ( var boneObject in boneObjects )
-      //{
-      //  var boneObjectName = boneObject.GetName();
-      //  if ( string.IsNullOrEmpty( boneObjectName ) )
-      //    continue;
+      var targetMesh = Context.Scene.Meshes.FirstOrDefault( x => x.HasBones && x.VertexCount > 0 );
+      if ( targetMesh is null )
+        return;
 
-      //  if ( boneLookup.ContainsKey( boneObject.GetName() ) )
-      //    continue;
+      var existingBoneNames = new HashSet<string>(
+        Context.Scene.Meshes.SelectMany( x => x.Bones ).Select( x => x.Name ),
+        StringComparer.Ordinal );
 
-      //  var boneParent = boneObject.Parent;
-      //  if ( boneParent is null )
-      //    continue;
+      foreach ( var obj in Context.GeometryGraph.objects )
+      {
+        var objName = obj.GetName();
+        if ( !ShouldPreserveAsAnimationBone( objName ) )
+          continue;
 
-      //  foreach ( var mesh in Context.Scene.Meshes )
-      //  {
-      //    if ( !mesh.Bones.Any( x => x.Name == boneParent.GetName() ) )
-      //      continue;
+        if ( existingBoneNames.Contains( objName ) )
+          continue;
 
-      //    System.Numerics.Matrix4x4.Invert( boneObject.MatrixLT, out var invMatrix );
-      //    var transform = invMatrix.ToAssimp();
-      //    transform.Transpose();
+        var node = Context.Scene.RootNode.FindNode( objName ) ?? EnsureSceneNodeForObject( obj );
+        if ( node is null )
+          continue;
 
-      //    var bone = new Bone
-      //    {
-      //      Name = boneObject.GetName(),
-      //      OffsetMatrix = transform
-      //    };
+        var bone = new Bone
+        {
+          Name = objName,
+          OffsetMatrix = CreateBoneOffsetMatrix( obj )
+        };
 
-      //    for ( var i = 0; i < mesh.VertexCount; i++ )
-      //      bone.VertexWeights.Add( new VertexWeight( i, 0f ) );
+        for ( var i = 0; i < targetMesh.VertexCount; i++ )
+          bone.VertexWeights.Add( new VertexWeight( i, 0f ) );
 
-      //    mesh.Bones.Add( bone );
-      //  }
-      //}
+        targetMesh.Bones.Add( bone );
+        existingBoneNames.Add( objName );
+      }
+    }
+
+    private bool ShouldPreserveAsAnimationBone( string objName )
+    {
+      if ( string.IsNullOrWhiteSpace( objName ) )
+        return false;
+
+      if ( AnimationHelperBoneNames.Contains( objName ) )
+        return true;
+
+      if ( objName.StartsWith( "foot_targ_", StringComparison.Ordinal ) )
+        return true;
+
+      if ( objName.StartsWith( "cam_", StringComparison.Ordinal ) )
+        return true;
+
+      return false;
+    }
+
+    private Node EnsureSceneNodeForObject( objOBJ obj )
+    {
+      if ( Context.Nodes.TryGetValue( obj.id, out var existingNode ) )
+        return existingNode;
+
+      var objName = obj.GetName();
+      if ( string.IsNullOrWhiteSpace( objName ) )
+        objName = $"Bone{obj.id}";
+
+      var existingSceneNode = Context.Scene.RootNode.FindNode( objName );
+      if ( existingSceneNode != null )
+      {
+        Context.Nodes[ obj.id ] = existingSceneNode;
+        if ( !Context.NodeNames.ContainsKey( objName ) )
+          Context.NodeNames.Add( objName, existingSceneNode );
+        return existingSceneNode;
+      }
+
+      var parentNode = obj.Parent != null
+        ? EnsureSceneNodeForObject( obj.Parent )
+        : Context.RootNode;
+
+      var node = new Node( objName, parentNode );
+      parentNode.Children.Add( node );
+      Context.Nodes[ obj.id ] = node;
+
+      if ( !Context.NodeNames.ContainsKey( objName ) )
+        Context.NodeNames.Add( objName, node );
+
+      var transform = obj.MatrixModel.ToAssimp();
+      transform.Transpose();
+      node.Transform = transform;
+
+      return node;
+    }
+
+    private Assimp.Matrix4x4 CreateBoneOffsetMatrix( objOBJ boneObject )
+    {
+      System.Numerics.Matrix4x4.Invert( boneObject.MatrixLT, out var invMatrix );
+      var transform = invMatrix.ToAssimp();
+      transform.Transpose();
+      return transform;
     }
 
     private void RenameBones()
